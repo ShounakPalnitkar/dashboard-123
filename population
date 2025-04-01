@@ -1,10 +1,9 @@
 from flask import Flask, jsonify
 import os
-import random
 
 app = Flask(__name__)
 
-# Sample data (2023 estimates in millions)
+# Sample population data
 countries = [
     {"name": "India", "population": 1428, "growth": 0.9, "density": 464, "urban": 35, "fertility": 2.1, "flag": "🇮🇳"},
     {"name": "China", "population": 1425, "growth": 0.4, "density": 153, "urban": 61, "fertility": 1.7, "flag": "🇨🇳"},
@@ -17,32 +16,27 @@ countries = [
 
 @app.route('/')
 def dashboard():
-    return f"""
+    return """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Population Dashboard with 7 Visualizations</title>
+    <title>Population Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <style>
-        body {{ padding: 20px; background-color: #f8f9fa; }}
-        .viz-card {{ margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px; }}
-        .card-header {{ background-color: #0d6efd; color: white; font-weight: bold; }}
-        .chart-container {{ position: relative; height: 300px; width: 100%; }}
-        .progress {{ height: 25px; }}
-        .flag {{ font-size: 1.8em; }}
+        body { padding: 20px; }
+        .chart-container { height: 300px; }
+        .card { margin-bottom: 20px; }
     </style>
 </head>
 <body>
-    <div class="container-fluid">
-        <h1 class="text-center mb-4">🌍 Advanced Population Dashboard</h1>
+    <div class="container">
+        <h1 class="text-center mb-4">🌍 Population Dashboard</h1>
         
         <div class="row">
-            <!-- Visualization 1: Population Bar Chart -->
-            <div class="col-lg-6">
-                <div class="viz-card card">
-                    <div class="card-header">1. Population by Country (Millions)</div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Population by Country</div>
                     <div class="card-body">
                         <div class="chart-container">
                             <canvas id="populationChart"></canvas>
@@ -50,11 +44,9 @@ def dashboard():
                     </div>
                 </div>
             </div>
-            
-            <!-- Visualization 2: Growth Rate Radar Chart -->
-            <div class="col-lg-6">
-                <div class="viz-card card">
-                    <div class="card-header">2. Growth Rate Comparison</div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">Growth Rates</div>
                     <div class="card-body">
                         <div class="chart-container">
                             <canvas id="growthChart"></canvas>
@@ -64,251 +56,65 @@ def dashboard():
             </div>
         </div>
         
-        <div class="row">
-            <!-- Visualization 3: Population Pie Chart -->
-            <div class="col-lg-6">
-                <div class="viz-card card">
-                    <div class="card-header">3. World Population Distribution</div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="pieChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Visualization 4: Urbanization Progress Bars -->
-            <div class="col-lg-6">
-                <div class="viz-card card">
-                    <div class="card-header">4. Urban Population (%)</div>
-                    <div class="card-body">
-                        <div id="urbanBars">
-                            <!-- Filled by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="row">
-            <!-- Visualization 5: Density Scatter Plot -->
-            <div class="col-lg-6">
-                <div class="viz-card card">
-                    <div class="card-header">5. Population Density (People/km²)</div>
-                    <div class="card-body">
-                        <div class="chart-container">
-                            <canvas id="densityChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Visualization 6: Fertility Rate Gauge -->
-            <div class="col-lg-6">
-                <div class="viz-card card">
-                    <div class="card-header">6. Fertility Rate (Children per Woman)</div>
-                    <div class="card-body">
-                        <div id="fertilityGauges" class="row">
-                            <!-- Filled by JavaScript -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Visualization 7: Interactive Data Table -->
-        <div class="row">
-            <div class="col-12">
-                <div class="viz-card card">
-                    <div class="card-header">7. Complete Country Data</div>
-                    <div class="card-body">
-                        <table class="table table-striped table-hover">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th>Flag</th>
-                                    <th>Country</th>
-                                    <th>Population (M)</th>
-                                    <th>Growth (%)</th>
-                                    <th>Density</th>
-                                    <th>Urban (%)</th>
-                                    <th>Fertility</th>
-                                </tr>
-                            </thead>
-                            <tbody id="dataTable">
-                                <!-- Filled by JavaScript -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        <div class="card mt-4">
+            <div class="card-header">Country Data</div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Country</th>
+                            <th>Population</th>
+                            <th>Growth</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dataTable"></tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <script>
-    document.addEventListener('DOMContentLoaded', function() {{
-        fetch('/data')
-            .then(res => res.json())
-            .then(data => {{
-                // Process data
-                const countryNames = data.map(d => d.name);
-                const populations = data.map(d => d.population);
-                const growthRates = data.map(d => d.growth);
-                const densities = data.map(d => d.density);
-                const urbanPercents = data.map(d => d.urban);
-                const fertilityRates = data.map(d => d.fertility);
-                
-                // 1. Population Bar Chart
-                new Chart(document.getElementById('populationChart'), {{
-                    type: 'bar',
-                    data: {{
-                        labels: countryNames,
-                        datasets: [{{
-                            label: 'Population (Millions)',
-                            data: populations,
-                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1
-                        }}]
-                    }},
-                    options: {{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {{ y: {{ beginAtZero: true }} }}
-                    }}
-                }});
-                
-                // 2. Growth Rate Radar Chart
-                new Chart(document.getElementById('growthChart'), {{
-                    type: 'radar',
-                    data: {{
-                        labels: countryNames,
-                        datasets: [{{
-                            label: 'Growth Rate (%)',
-                            data: growthRates,
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            pointBackgroundColor: 'rgba(255, 99, 132, 1)',
-                            pointBorderColor: '#fff',
-                            pointHoverRadius: 5
-                        }}]
-                    }},
-                    options: {{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {{ r: {{ beginAtZero: true }} }}
-                    }}
-                }});
-                
-                // 3. Population Pie Chart
-                new Chart(document.getElementById('pieChart'), {{
-                    type: 'pie',
-                    data: {{
-                        labels: countryNames,
-                        datasets: [{{
-                            data: populations,
-                            backgroundColor: [
-                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
-                                '#9966FF', '#FF9F40', '#8AC24A'
-                            ],
-                            hoverOffset: 4
-                        }}]
-                    }},
-                    options: {{
-                        responsive: true,
-                        maintainAspectRatio: false
-                    }}
-                }});
-                
-                // 4. Urbanization Progress Bars
-                let urbanHTML = '';
-                data.forEach(country => {{
-                    urbanHTML += `
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span>${country.flag} ${country.name}</span>
-                            <span>${country.urban}%</span>
-                        </div>
-                        <div class="progress">
-                            <div class="progress-bar bg-success" 
-                                 role="progressbar" 
-                                 style="width: ${country.urban}%" 
-                                 aria-valuenow="${country.urban}" 
-                                 aria-valuemin="0" 
-                                 aria-valuemax="100">
-                            </div>
-                        </div>
-                    </div>`;
-                }});
-                document.getElementById('urbanBars').innerHTML = urbanHTML;
-                
-                // 5. Density Scatter Plot
-                new Chart(document.getElementById('densityChart'), {{
-                    type: 'scatter',
-                    data: {{
-                        labels: countryNames,
-                        datasets: [{{
-                            label: 'Population Density',
-                            data: data.map(d => ({{
-                                x: d.population,
-                                y: d.density,
-                                r: d.growth * 2
-                            }})),
-                            backgroundColor: 'rgba(75, 192, 192, 0.7)',
-                            borderColor: 'rgba(75, 192, 192, 1)',
-                        }}]
-                    }},
-                    options: {{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {{
-                            x: {{ 
-                                title: {{ display: true, text: 'Population (Millions)' }},
-                                beginAtZero: true 
-                            }},
-                            y: {{ 
-                                title: {{ display: true, text: 'Density (People/km²)' }},
-                                beginAtZero: true 
-                            }}
-                        }}
-                    }}
-                }});
-                
-                // 6. Fertility Rate Gauges
-                let fertilityHTML = '';
-                data.forEach(country => {{
-                    const color = country.fertility > 2.1 ? 'danger' : 
-                                (country.fertility < 1.8 ? 'warning' : 'success');
-                    fertilityHTML += `
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-body text-center">
-                                <div class="flag mb-2">${country.flag}</div>
-                                <h5>${country.name}</h5>
-                                <div class="fs-1 text-${color}">${country.fertility}</div>
-                                <small>Children per woman</small>
-                            </div>
-                        </div>
-                    </div>`;
-                }});
-                document.getElementById('fertilityGauges').innerHTML = fertilityHTML;
-                
-                // 7. Data Table
-                let tableHTML = '';
-                data.forEach(country => {{
-                    tableHTML += `
-                    <tr>
-                        <td class="flag">${country.flag}</td>
-                        <td>${country.name}</td>
-                        <td>${country.population}</td>
-                        <td>${country.growth}</td>
-                        <td>${country.density}</td>
-                        <td>${country.urban}</td>
-                        <td>${country.fertility}</td>
-                    </tr>`;
-                }});
-                document.getElementById('dataTable').innerHTML = tableHTML;
-            }});
-    }});
+    fetch('/data')
+        .then(res => res.json())
+        .then(data => {
+            // Population Chart
+            new Chart(document.getElementById('populationChart'), {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.name),
+                    datasets: [{
+                        label: 'Population (millions)',
+                        data: data.map(d => d.population),
+                        backgroundColor: 'rgba(54, 162, 235, 0.7)'
+                    }]
+                }
+            });
+            
+            // Growth Chart
+            new Chart(document.getElementById('growthChart'), {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.name),
+                    datasets: [{
+                        label: 'Growth (%)',
+                        data: data.map(d => d.growth),
+                        borderColor: 'rgba(255, 99, 132, 0.7)'
+                    }]
+                }
+            });
+            
+            // Table Data
+            let tableHTML = '';
+            data.forEach(country => {
+                tableHTML += `
+                <tr>
+                    <td>${country.flag} ${country.name}</td>
+                    <td>${country.population}</td>
+                    <td>${country.growth}%</td>
+                </tr>`;
+            });
+            document.getElementById('dataTable').innerHTML = tableHTML;
+        });
     </script>
 </body>
 </html>
