@@ -1,0 +1,202 @@
+# app.py - Complete Population Dashboard
+from flask import Flask, render_template, jsonify
+import pandas as pd
+import os
+
+app = Flask(__name__)
+
+# Sample population data (in a real app, you'd load from a database or API)
+population_data = [
+    {"country": "China", "population": 1439323776, "yearly_change": 0.39, "density": 153},
+    {"country": "India", "population": 1380004385, "yearly_change": 0.99, "density": 464},
+    {"country": "United States", "population": 331002651, "yearly_change": 0.59, "density": 36},
+    {"country": "Indonesia", "population": 273523615, "yearly_change": 1.07, "density": 151},
+    {"country": "Pakistan", "population": 220892340, "yearly_change": 2.00, "density": 287},
+    {"country": "Brazil", "population": 212559417, "yearly_change": 0.72, "density": 25},
+    {"country": "Nigeria", "population": 206139589, "yearly_change": 2.58, "density": 226},
+    {"country": "Bangladesh", "population": 164689383, "yearly_change": 1.01, "density": 1265},
+    {"country": "Russia", "population": 145934462, "yearly_change": 0.04, "density": 9},
+    {"country": "Mexico", "population": 128932753, "yearly_change": 1.06, "density": 66}
+]
+
+@app.route('/')
+def dashboard():
+    # Serve the dashboard HTML with embedded CSS and JS
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>World Population Dashboard</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+        <style>
+            body {{
+                padding: 20px;
+                background-color: #f8f9fa;
+            }}
+            .card {{
+                margin-bottom: 20px;
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }}
+            .card-header {{
+                font-weight: bold;
+                background-color: #0d6efd;
+                color: white;
+            }}
+            h1 {{
+                color: #0d6efd;
+                margin-bottom: 20px;
+            }}
+            table {{
+                margin-top: 20px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container-fluid">
+            <h1>World Population Dashboard</h1>
+            
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Population by Country</div>
+                        <div class="card-body">
+                            <canvas id="populationChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">Top 5 Most Populous Countries</div>
+                        <div class="card-body">
+                            <div id="topCountriesChart"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">Population Data Table</div>
+                        <div class="card-body">
+                            <table id="populationTable" class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Country</th>
+                                        <th>Population</th>
+                                        <th>Yearly Change</th>
+                                        <th>Density (p/km²)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody">
+                                    <!-- Data will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {{
+                // Get data from Flask endpoint
+                fetch('/api/population')
+                    .then(response => response.json())
+                    .then(data => {{
+                        // Process data
+                        const countries = data.map(item => item.country);
+                        const populations = data.map(item => item.population);
+                        
+                        // Sort and get top 5 countries
+                        const sortedData = [...data].sort((a, b) => b.population - a.population);
+                        const top5Countries = sortedData.slice(0, 5).map(item => item.country);
+                        const top5Populations = sortedData.slice(0, 5).map(item => item.population);
+                        
+                        // Create bar chart
+                        const ctx = document.getElementById('populationChart').getContext('2d');
+                        new Chart(ctx, {{
+                            type: 'bar',
+                            data: {{
+                                labels: countries,
+                                datasets: [{{
+                                    label: 'Population',
+                                    data: populations,
+                                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                                    borderColor: 'rgba(54, 162, 235, 1)',
+                                    borderWidth: 1
+                                }}]
+                            }},
+                            options: {{
+                                responsive: true,
+                                plugins: {{
+                                    legend: {{ display: false }},
+                                    title: {{
+                                        display: true,
+                                        text: 'Population Distribution'
+                                    }}
+                                }},
+                                scales: {{
+                                    y: {{ beginAtZero: true }}
+                                }}
+                            }}
+                        }});
+                        
+                        // Create top countries chart
+                        const topCountriesOptions = {{
+                            series: [{{
+                                name: 'Population',
+                                data: top5Populations
+                            }}],
+                            chart: {{
+                                type: 'bar',
+                                height: 300
+                            }},
+                            plotOptions: {{
+                                bar: {{
+                                    borderRadius: 4,
+                                    horizontal: true,
+                                }}
+                            }},
+                            dataLabels: {{
+                                enabled: false
+                            }},
+                            xaxis: {{
+                                categories: top5Countries,
+                            }}
+                        }};
+                        
+                        const topCountriesChart = new ApexCharts(
+                            document.querySelector("#topCountriesChart"), 
+                            topCountriesOptions
+                        );
+                        topCountriesChart.render();
+                        
+                        // Populate table
+                        const tableBody = document.querySelector('#tableBody');
+                        data.forEach(item => {{
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${{item.country}}</td>
+                                <td>${{item.population.toLocaleString()}}</td>
+                                <td>${{item.yearly_change}}%</td>
+                                <td>${{item.density}}</td>
+                            `;
+                            tableBody.appendChild(row);
+                        }});
+                    }});
+            }});
+        </script>
+    </body>
+    </html>
+    """
+
+@app.route('/api/population')
+def get_population_data():
+    return jsonify(population_data)
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
